@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#173a34" />
+    <meta
+      name="description"
+      content="先审核今天的一件小事，晚上填写执行结果，再完成复盘与改进。"
+    />
+    <title>汝禾姐的一件小事闭环</title>
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="brand-kicker">汝禾姐 · 每日践行</p>
+          <h1>一件小事闭环</h1>
+        </div>
+        <div class="today-badge" id="todayBadge"></div>
+      </header>
+
+      <nav class="tabs" aria-label="主要功能">
+        <button class="tab is-active" type="button" data-view="plan">早上定事</button>
+        <button class="tab" type="button" data-view="review">晚上复盘</button>
+        <button class="tab" type="button" data-view="history">历史记录</button>
+      </nav>
+
+      <main>
+        <section class="view is-active" id="planView">
+          <div class="section-heading">
+            <div>
+              <span class="step-label">第一步</span>
+              <h2>写下今天的一件小事</h2>
+            </div>
+            <p>先写你原本想做的事，系统会逐项检查。</p>
+          </div>
+
+          <form id="planForm" class="work-panel">
+            <label class="field">
+              <span>你的名字</span>
+              <input id="memberName" autocomplete="name" maxlength="30" placeholder="例如：汝禾姐" required />
+            </label>
+
+            <label class="field field-wide">
+              <span>今天要做的一件小事</span>
+              <textarea
+                id="smallThingInput"
+                rows="5"
+                maxlength="300"
+                placeholder="例如：我今天用 AI 帮我改一段文案"
+                required
+              ></textarea>
+              <small><span id="thingCount">0</span>/300 字</small>
+            </label>
+
+            <button class="primary-action" type="submit">开始审核</button>
+          </form>
+
+          <section id="auditResult" class="result-panel" hidden aria-live="polite"></section>
+
+          <section id="revisionBuilder" class="revision-panel" hidden>
+            <div class="section-heading compact">
+              <div>
+                <span class="step-label">重新梳理</span>
+                <h2>把缺失的部分补完整</h2>
+              </div>
+              <p>系统会把这些内容合成一条合格的小事。</p>
+            </div>
+
+            <div class="builder-grid">
+              <label class="field">
+                <span>预计用时</span>
+                <input id="revTime" placeholder="例如：45分钟" />
+              </label>
+              <label class="field">
+                <span>具体动作和数量</span>
+                <input id="revAction" placeholder="例如：写出3个开头钩子" />
+              </label>
+              <label class="field">
+                <span>做完留下什么</span>
+                <input id="revDeliverable" placeholder="例如：1份钩子清单" />
+              </label>
+              <label class="field">
+                <span>做完检查什么</span>
+                <input id="revCheck" placeholder="例如：是否点中人群、痛点和结果" />
+              </label>
+              <label class="field field-wide">
+                <span>怎么获得反馈</span>
+                <input id="revFeedback" placeholder="例如：发到小组群，请2位伙伴选出最想看的1条" />
+              </label>
+            </div>
+
+            <div class="builder-actions">
+              <button id="generateRevisionBtn" class="secondary-action" type="button">生成修改版</button>
+            </div>
+
+            <div id="revisionPreview" class="revision-preview" hidden>
+              <span>修改后的“一件小事”</span>
+              <p id="revisionText"></p>
+              <button id="approveRevisionBtn" class="primary-action" type="button">确认并开始执行</button>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="reviewView">
+          <div class="section-heading">
+            <div>
+              <span class="step-label">第二步</span>
+              <h2>晚上填写执行结果</h2>
+            </div>
+            <p>先有真实结果，再谈复盘和改进。</p>
+          </div>
+
+          <div id="reviewEmpty" class="empty-state">
+            今天还没有通过审核的一件小事。先到“早上定事”完成审核。
+          </div>
+
+          <form id="reviewForm" class="work-panel" hidden>
+            <div class="approved-summary field-wide">
+              <span>今天通过审核的小事</span>
+              <p id="approvedThingText"></p>
+            </div>
+
+            <label class="field field-wide">
+              <span>实际完成了什么结果</span>
+              <textarea id="executionResult" rows="3" maxlength="500" placeholder="写清做了什么、留下了什么完成物" required></textarea>
+            </label>
+
+            <label class="field">
+              <span>哪里做得好</span>
+              <textarea id="wentWell" rows="4" maxlength="400" placeholder="哪个动作有效？为什么有效？" required></textarea>
+            </label>
+
+            <label class="field">
+              <span>哪里卡住了</span>
+              <textarea id="wentWrong" rows="4" maxlength="400" placeholder="哪里费力、没完成或结果不理想？" required></textarea>
+            </label>
+
+            <label class="field">
+              <span>你得到了什么反馈</span>
+              <textarea id="feedbackEvidence" rows="4" maxlength="400" placeholder="数据、评论、他人回应或自己的检查结果" required></textarea>
+            </label>
+
+            <label class="field">
+              <span>明天只改哪一个点</span>
+              <textarea id="nextImprovement" rows="4" maxlength="300" placeholder="一次只改一个点，写成一个具体动作" required></textarea>
+            </label>
+
+            <label class="field field-wide">
+              <span>哪个做法值得固化</span>
+              <textarea id="solidifyMethod" rows="3" maxlength="400" placeholder="可以沉淀成模板、清单、步骤或一句方法论；没有就写“暂不固化”" required></textarea>
+            </label>
+
+            <button class="primary-action" type="submit">完成今日复盘</button>
+          </form>
+
+          <section id="reviewResult" class="result-panel" hidden aria-live="polite"></section>
+        </section>
+
+        <section class="view" id="historyView">
+          <div class="section-heading">
+            <div>
+              <span class="step-label">第三步</span>
+              <h2>看见自己的积累</h2>
+            </div>
+            <p>每一条记录，都是以后可以继续使用的原料。</p>
+          </div>
+
+          <div class="history-toolbar">
+            <div class="history-stats" id="historyStats"></div>
+            <button id="exportBtn" class="secondary-action" type="button">导出记录</button>
+          </div>
+          <div id="historyList" class="history-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <template id="criterionTemplate">
+      <li class="criterion-row">
+        <span class="criterion-mark" aria-hidden="true"></span>
+        <div>
+          <strong></strong>
+          <p></p>
+        </div>
+      </li>
+    </template>
+
+    <script src="./review-engine.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
