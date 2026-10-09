@@ -199,6 +199,10 @@ h2 {
   box-shadow: none;
 }
 
+.seed-panel[hidden] {
+  display: none;
+}
+
 .seed-panel strong {
   color: var(--brand);
   font-weight: 850;
