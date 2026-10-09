@@ -1,6 +1,6 @@
 {
-  "name": "汝禾姐的一件小事闭环",
-  "short_name": "一件小事",
+  "name": "汝禾姐的一件小事工作台",
+  "short_name": "小事工作台",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#eef2f1",

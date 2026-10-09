@@ -29,7 +29,7 @@
     {
       key: 'quantity',
       name: '数量标准',
-      test: (text) => /(\d+|[一二三四五六七八九十两半])[条篇段个次页分钟小时字节题份张公里遍轮组]/.test(text),
+      test: (text) => /(\d+|[一二三四五六七八九十两半])[条篇段个件项位次页分钟小时字节题份张公里遍轮组]/.test(text),
       pass: '已经写明做多少、做几条或做多长时间。',
       fail: '没有数量边界，做到哪里算完成还不够清楚。'
     },
@@ -88,5 +88,30 @@
     return '1份可查看的完成结果';
   }
 
-  return { cleanText, auditThing, guessDeliverable };
+  function hasQuantity(text) {
+    return /(\d+|[一二三四五六七八九十两半])[条篇段个件项位次页分钟小时字节题份张公里遍轮组]/.test(cleanText(text));
+  }
+
+  function normalizeAction(action) {
+    const normalized = cleanText(action);
+    if (!normalized) return '';
+    return hasQuantity(normalized) ? normalized : `完成1次“${normalized}”`;
+  }
+
+  function buildSmallThing({ time, obstacle, action, deliverable, feedback }) {
+    const safeTime = cleanText(time);
+    const safeObstacle = cleanText(obstacle);
+    const safeAction = normalizeAction(action);
+    const rawDeliverable = cleanText(deliverable);
+    const safeDeliverable = hasQuantity(rawDeliverable)
+      ? rawDeliverable
+      : `1份可查看的结果：${rawDeliverable}`;
+    const safeFeedback = cleanText(feedback);
+    if (![safeTime, safeObstacle, safeAction, rawDeliverable, safeFeedback].every(Boolean)) return '';
+
+    const check = `是否在${safeTime}内完成、是否留下${safeDeliverable}、是否真正推进了“${safeObstacle}”`;
+    return `今天我用${safeTime}，围绕“${safeObstacle}”这个卡点，${safeAction}，留下${safeDeliverable}。做完后检查${check}；反馈方式是晚上复盘：${safeFeedback}。`;
+  }
+
+  return { cleanText, auditThing, guessDeliverable, hasQuantity, normalizeAction, buildSmallThing };
 });

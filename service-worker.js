@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ruhejie-one-small-thing-v2';
+const CACHE_NAME = 'ruhejie-one-small-thing-v5';
 const ASSETS = ['./', './index.html', './styles.css', './review-engine.js', './app.js', './manifest.json'];
 
 self.addEventListener('install', (event) => {

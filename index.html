@@ -4,11 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#173a34" />
-    <meta
-      name="description"
-      content="先审核今天的一件小事，晚上填写执行结果，再完成复盘与改进。"
-    />
-    <title>汝禾姐的一件小事闭环</title>
+    <meta name="description" content="用五个简单问题确定今天最值得做的一件小事，做完复盘，再生成明天的起点。" />
+    <title>汝禾姐的一件小事工作台</title>
     <link rel="manifest" href="./manifest.json" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -16,145 +13,187 @@
     <div class="app-shell">
       <header class="topbar">
         <div>
-          <p class="brand-kicker">汝禾姐 · 每日践行</p>
-          <h1>一件小事闭环</h1>
+          <p class="brand-kicker">汝禾姐 · 每日行动闭环</p>
+          <h1>一件小事工作台</h1>
+          <p class="brand-summary">今天只确定一件最值得做的事，晚上用结果把明天接上。</p>
         </div>
         <div class="today-badge" id="todayBadge"></div>
       </header>
 
       <nav class="tabs" aria-label="主要功能">
-        <button class="tab is-active" type="button" data-view="plan">早上定事</button>
-        <button class="tab" type="button" data-view="review">晚上复盘</button>
-        <button class="tab" type="button" data-view="history">历史记录</button>
+        <button class="tab is-active" type="button" data-view="plan">找到今天的一件小事</button>
+        <button class="tab" type="button" data-view="review">做完复盘</button>
+        <button class="tab" type="button" data-view="history">成长记录</button>
       </nav>
 
       <main>
         <section class="view is-active" id="planView">
+          <section id="seedPanel" class="seed-panel" hidden>
+            <div>
+              <p class="seed-sentence">你上次复盘后决定，今天先改这一点：<strong id="seedText"></strong></p>
+            </div>
+            <button id="useSeedBtn" class="secondary-action" type="button">把这一点带入今天的 5 问</button>
+          </section>
+
           <div class="section-heading">
             <div>
-              <span class="step-label">第一步</span>
-              <h2>写下今天的一件小事</h2>
+              <span class="step-label">第一段 · 找准目标</span>
+              <h2>回答 5 个简单问题</h2>
             </div>
-            <p>先写你原本想做的事，系统会逐项检查。</p>
+            <p>一次只回答一个，不用先学会怎么写“一件小事”。</p>
           </div>
 
-          <form id="planForm" class="work-panel">
-            <label class="field">
-              <span>你的名字</span>
-              <input id="memberName" autocomplete="name" maxlength="30" placeholder="例如：汝禾姐" required />
-            </label>
+          <form id="discoveryForm" class="guided-panel">
+            <div class="progress-head">
+              <span id="questionCounter">问题 1 / 5</span>
+              <span id="progressLabel">先确定今天真正想推进什么</span>
+            </div>
+            <div class="progress-track" aria-hidden="true"><span id="progressBar"></span></div>
 
-            <label class="field field-wide">
-              <span>今天要做的一件小事</span>
-              <textarea
-                id="smallThingInput"
-                rows="5"
-                maxlength="300"
-                placeholder="例如：我今天用 AI 帮我改一段文案"
-                required
-              ></textarea>
-              <small><span id="thingCount">0</span>/300 字</small>
-            </label>
+            <section class="question-step is-active" data-step="0">
+              <label class="field compact-field">
+                <span>你的名字</span>
+                <input id="memberName" autocomplete="name" maxlength="30" placeholder="例如：汝禾姐" required />
+              </label>
+              <div class="question-copy">
+                <span class="question-number">01</span>
+                <div>
+                  <h3>今天结束时，你最希望推进哪件事？</h3>
+                  <p>先写结果方向，不用马上想怎么做。</p>
+                </div>
+              </div>
+              <label class="field">
+                <span>我今天最想推进</span>
+                <textarea id="goalInput" rows="4" maxlength="180" placeholder="例如：让用户更容易理解什么是一件小事" required></textarea>
+              </label>
+            </section>
 
-            <button class="primary-action" type="submit">开始审核</button>
+            <section class="question-step" data-step="1" hidden>
+              <div class="question-copy">
+                <span class="question-number">02</span>
+                <div>
+                  <h3>现在挡住你的最大卡点是什么？</h3>
+                  <p>只选一个最影响结果的问题。</p>
+                </div>
+              </div>
+              <label class="field">
+                <span>我现在最卡在</span>
+                <textarea id="obstacleInput" rows="4" maxlength="180" placeholder="例如：内容太多，不知道先讲哪一点" required></textarea>
+              </label>
+            </section>
+
+            <section class="question-step" data-step="2" hidden>
+              <div class="question-copy">
+                <span class="question-number">03</span>
+                <div>
+                  <h3>今天你愿意用多长时间，完成什么最小动作？</h3>
+                  <p>动作最好带数量，30 到 120 分钟内能做完。</p>
+                </div>
+              </div>
+              <fieldset class="time-picker">
+                <legend>可投入时间</legend>
+                <label><input type="radio" name="time" value="30分钟" />30 分钟</label>
+                <label><input type="radio" name="time" value="60分钟" checked />60 分钟</label>
+                <label><input type="radio" name="time" value="90分钟" />90 分钟</label>
+                <label><input type="radio" name="time" value="120分钟" />120 分钟</label>
+              </fieldset>
+              <label class="field">
+                <span>我今天只做这个动作</span>
+                <textarea id="actionInput" rows="4" maxlength="180" placeholder="例如：写出 3 个短视频开头，并选出 1 个" required></textarea>
+              </label>
+            </section>
+
+            <section class="question-step" data-step="3" hidden>
+              <div class="question-copy">
+                <span class="question-number">04</span>
+                <div>
+                  <h3>做完以后，要留下什么看得见的结果？</h3>
+                  <p>结果可以是一段文字、一条视频、一张清单或一份方案。</p>
+                </div>
+              </div>
+              <label class="field">
+                <span>我会留下</span>
+                <textarea id="deliverableInput" rows="4" maxlength="180" placeholder="例如：1 份包含 3 个开头的文案清单" required></textarea>
+              </label>
+            </section>
+
+            <section class="question-step" data-step="4" hidden>
+              <div class="question-copy">
+                <span class="question-number">05</span>
+                <div>
+                  <h3>你准备从哪里知道这件事做得好不好？</h3>
+                  <p>选择一种真实反馈，不靠“我感觉还行”。</p>
+                </div>
+              </div>
+              <label class="field">
+                <span>我的反馈方式</span>
+                <textarea id="feedbackInput" rows="4" maxlength="180" placeholder="例如：请 AI 对照用户痛点检查，再让 1 位伙伴选出最想看的开头" required></textarea>
+              </label>
+            </section>
+
+            <p id="stepError" class="form-error" hidden></p>
+            <div class="guided-actions">
+              <button id="backBtn" class="secondary-action" type="button" hidden>上一步</button>
+              <button id="nextBtn" class="primary-action" type="button">下一步</button>
+            </div>
           </form>
 
-          <section id="auditResult" class="result-panel" hidden aria-live="polite"></section>
-
-          <section id="revisionBuilder" class="revision-panel" hidden>
-            <div class="section-heading compact">
+          <section id="planCandidate" class="candidate-panel" hidden aria-live="polite">
+            <div class="candidate-head">
               <div>
-                <span class="step-label">重新梳理</span>
-                <h2>把缺失的部分补完整</h2>
+                <span class="step-label">根据你的回答生成</span>
+                <h2>今天最值得做的一件小事</h2>
               </div>
-              <p>系统会把这些内容合成一条合格的小事。</p>
+              <span id="candidateStatus" class="status-chip pass">6 / 6 项合格</span>
             </div>
-
-            <div class="builder-grid">
-              <label class="field">
-                <span>预计用时</span>
-                <input id="revTime" placeholder="例如：45分钟" />
-              </label>
-              <label class="field">
-                <span>具体动作和数量</span>
-                <input id="revAction" placeholder="例如：写出3个开头钩子" />
-              </label>
-              <label class="field">
-                <span>做完留下什么</span>
-                <input id="revDeliverable" placeholder="例如：1份钩子清单" />
-              </label>
-              <label class="field">
-                <span>做完检查什么</span>
-                <input id="revCheck" placeholder="例如：是否点中人群、痛点和结果" />
-              </label>
-              <label class="field field-wide">
-                <span>怎么获得反馈</span>
-                <input id="revFeedback" placeholder="例如：发到小组群，请2位伙伴选出最想看的1条" />
-              </label>
-            </div>
-
-            <div class="builder-actions">
-              <button id="generateRevisionBtn" class="secondary-action" type="button">生成修改版</button>
-            </div>
-
-            <div id="revisionPreview" class="revision-preview" hidden>
-              <span>修改后的“一件小事”</span>
-              <p id="revisionText"></p>
-              <button id="approveRevisionBtn" class="primary-action" type="button">确认并开始执行</button>
+            <p id="candidateText" class="candidate-text"></p>
+            <ul id="candidateChecks" class="mini-checks"></ul>
+            <div class="candidate-actions">
+              <button id="editAnswersBtn" class="secondary-action" type="button">返回修改</button>
+              <button id="confirmPlanBtn" class="primary-action" type="button">确认，今天就做这件事</button>
             </div>
           </section>
+
+          <section id="savedPlan" class="result-panel pass" hidden aria-live="polite"></section>
         </section>
 
         <section class="view" id="reviewView">
           <div class="section-heading">
             <div>
-              <span class="step-label">第二步</span>
-              <h2>晚上填写执行结果</h2>
+              <span class="step-label">第二段 · 用结果说话</span>
+              <h2>做完以后回来复盘</h2>
             </div>
-            <p>先有真实结果，再谈复盘和改进。</p>
+            <p>不要求完美，只把真实结果和卡点写清楚。</p>
           </div>
 
-          <div id="reviewEmpty" class="empty-state">
-            今天还没有通过审核的一件小事。先到“早上定事”完成审核。
-          </div>
+          <div id="reviewEmpty" class="empty-state">今天还没有确认的一件小事。先到“找到今天的一件小事”完成问答。</div>
 
           <form id="reviewForm" class="work-panel" hidden>
             <div class="approved-summary field-wide">
-              <span>今天通过审核的小事</span>
+              <span>今天确认的一件小事</span>
               <p id="approvedThingText"></p>
             </div>
-
+            <label class="field">
+              <span>今天实际做到了什么？</span>
+              <textarea id="executionResult" rows="4" maxlength="400" placeholder="写事实和结果，不写空泛感受" required></textarea>
+            </label>
+            <label class="field">
+              <span>哪些没有做到？</span>
+              <textarea id="notCompleted" rows="4" maxlength="300" placeholder="没有就写“没有”" required></textarea>
+            </label>
             <label class="field field-wide">
-              <span>实际完成了什么结果</span>
-              <textarea id="executionResult" rows="3" maxlength="500" placeholder="写清做了什么、留下了什么完成物" required></textarea>
+              <span>遇到了什么新的卡点？</span>
+              <textarea id="newBlockers" rows="3" maxlength="400" placeholder="哪个地方比预想更难？为什么？" required></textarea>
             </label>
-
-            <label class="field">
-              <span>哪里做得好</span>
-              <textarea id="wentWell" rows="4" maxlength="400" placeholder="哪个动作有效？为什么有效？" required></textarea>
-            </label>
-
-            <label class="field">
-              <span>哪里卡住了</span>
-              <textarea id="wentWrong" rows="4" maxlength="400" placeholder="哪里费力、没完成或结果不理想？" required></textarea>
-            </label>
-
-            <label class="field">
-              <span>你得到了什么反馈</span>
-              <textarea id="feedbackEvidence" rows="4" maxlength="400" placeholder="数据、评论、他人回应或自己的检查结果" required></textarea>
-            </label>
-
-            <label class="field">
-              <span>明天只改哪一个点</span>
-              <textarea id="nextImprovement" rows="4" maxlength="300" placeholder="一次只改一个点，写成一个具体动作" required></textarea>
-            </label>
-
             <label class="field field-wide">
-              <span>哪个做法值得固化</span>
-              <textarea id="solidifyMethod" rows="3" maxlength="400" placeholder="可以沉淀成模板、清单、步骤或一句方法论；没有就写“暂不固化”" required></textarea>
+              <span>下一次可以怎样改进？</span>
+              <textarea id="improvements" rows="4" maxlength="500" placeholder="请列出 1、2、3 点具体改法" required></textarea>
             </label>
-
-            <button class="primary-action" type="submit">完成今日复盘</button>
+            <label class="field field-wide next-point-field">
+              <span>如果明天只改一个点，你选哪一个？</span>
+              <textarea id="nextImprovement" rows="3" maxlength="260" placeholder="写成明天能执行的一个具体动作" required></textarea>
+            </label>
+            <button class="primary-action" type="submit">完成复盘，生成明日线索</button>
           </form>
 
           <section id="reviewResult" class="result-panel" hidden aria-live="polite"></section>
@@ -163,12 +202,11 @@
         <section class="view" id="historyView">
           <div class="section-heading">
             <div>
-              <span class="step-label">第三步</span>
-              <h2>看见自己的积累</h2>
+              <span class="step-label">第三段 · 看见积累</span>
+              <h2>每一次闭环都留下证据</h2>
             </div>
-            <p>每一条记录，都是以后可以继续使用的原料。</p>
+            <p>记录不是为了打卡，而是为了让下一次做得更准。</p>
           </div>
-
           <div class="history-toolbar">
             <div class="history-stats" id="historyStats"></div>
             <button id="exportBtn" class="secondary-action" type="button">导出记录</button>
@@ -177,16 +215,6 @@
         </section>
       </main>
     </div>
-
-    <template id="criterionTemplate">
-      <li class="criterion-row">
-        <span class="criterion-mark" aria-hidden="true"></span>
-        <div>
-          <strong></strong>
-          <p></p>
-        </div>
-      </li>
-    </template>
 
     <script src="./review-engine.js"></script>
     <script src="./app.js"></script>

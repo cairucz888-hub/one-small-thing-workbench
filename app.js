@@ -1,43 +1,60 @@
-const STORAGE_KEY = 'ruhejieOneSmallThingV1';
-const { cleanText, auditThing, guessDeliverable } = window.SmallThingReviewEngine;
+const STORAGE_KEY = 'ruhejieOneSmallThingV2';
+const LEGACY_STORAGE_KEY = 'ruhejieOneSmallThingV1';
+const { cleanText, auditThing, buildSmallThing } = window.SmallThingReviewEngine;
 
 const state = loadState();
-let latestAudit = null;
+let wizardStep = 0;
+let currentCandidate = null;
 let activeRecordId = null;
+
+const progressLabels = [
+  '先确定今天真正想推进什么',
+  '找到最影响结果的一个卡点',
+  '把目标收缩成今天能完成的动作',
+  '明确做完以后留下什么',
+  '安排一个真实的反馈来源'
+];
 
 const els = {
   todayBadge: document.getElementById('todayBadge'),
   tabs: [...document.querySelectorAll('.tab')],
   views: [...document.querySelectorAll('.view')],
-  planForm: document.getElementById('planForm'),
+  seedPanel: document.getElementById('seedPanel'),
+  seedText: document.getElementById('seedText'),
+  useSeedBtn: document.getElementById('useSeedBtn'),
+  discoveryForm: document.getElementById('discoveryForm'),
+  questionSteps: [...document.querySelectorAll('.question-step')],
+  questionCounter: document.getElementById('questionCounter'),
+  progressLabel: document.getElementById('progressLabel'),
+  progressBar: document.getElementById('progressBar'),
   memberName: document.getElementById('memberName'),
-  smallThingInput: document.getElementById('smallThingInput'),
-  thingCount: document.getElementById('thingCount'),
-  auditResult: document.getElementById('auditResult'),
-  revisionBuilder: document.getElementById('revisionBuilder'),
-  revTime: document.getElementById('revTime'),
-  revAction: document.getElementById('revAction'),
-  revDeliverable: document.getElementById('revDeliverable'),
-  revCheck: document.getElementById('revCheck'),
-  revFeedback: document.getElementById('revFeedback'),
-  generateRevisionBtn: document.getElementById('generateRevisionBtn'),
-  revisionPreview: document.getElementById('revisionPreview'),
-  revisionText: document.getElementById('revisionText'),
-  approveRevisionBtn: document.getElementById('approveRevisionBtn'),
+  goalInput: document.getElementById('goalInput'),
+  obstacleInput: document.getElementById('obstacleInput'),
+  actionInput: document.getElementById('actionInput'),
+  deliverableInput: document.getElementById('deliverableInput'),
+  feedbackInput: document.getElementById('feedbackInput'),
+  stepError: document.getElementById('stepError'),
+  backBtn: document.getElementById('backBtn'),
+  nextBtn: document.getElementById('nextBtn'),
+  planCandidate: document.getElementById('planCandidate'),
+  candidateStatus: document.getElementById('candidateStatus'),
+  candidateText: document.getElementById('candidateText'),
+  candidateChecks: document.getElementById('candidateChecks'),
+  editAnswersBtn: document.getElementById('editAnswersBtn'),
+  confirmPlanBtn: document.getElementById('confirmPlanBtn'),
+  savedPlan: document.getElementById('savedPlan'),
   reviewEmpty: document.getElementById('reviewEmpty'),
   reviewForm: document.getElementById('reviewForm'),
   approvedThingText: document.getElementById('approvedThingText'),
   executionResult: document.getElementById('executionResult'),
-  wentWell: document.getElementById('wentWell'),
-  wentWrong: document.getElementById('wentWrong'),
-  feedbackEvidence: document.getElementById('feedbackEvidence'),
+  notCompleted: document.getElementById('notCompleted'),
+  newBlockers: document.getElementById('newBlockers'),
+  improvements: document.getElementById('improvements'),
   nextImprovement: document.getElementById('nextImprovement'),
-  solidifyMethod: document.getElementById('solidifyMethod'),
   reviewResult: document.getElementById('reviewResult'),
   historyStats: document.getElementById('historyStats'),
   historyList: document.getElementById('historyList'),
-  exportBtn: document.getElementById('exportBtn'),
-  criterionTemplate: document.getElementById('criterionTemplate')
+  exportBtn: document.getElementById('exportBtn')
 };
 
 function todayKey() {
@@ -58,14 +75,31 @@ function todayLabel() {
 
 function loadState() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    const parsed = JSON.parse(saved || legacy || '{}');
     return {
       memberName: typeof parsed.memberName === 'string' ? parsed.memberName : '',
-      records: Array.isArray(parsed.records) ? parsed.records : []
+      records: Array.isArray(parsed.records) ? parsed.records : [],
+      pendingSeed: normalizePendingSeed(parsed.pendingSeed)
     };
   } catch {
-    return { memberName: '', records: [] };
+    return { memberName: '', records: [], pendingSeed: null };
   }
+}
+
+function normalizePendingSeed(seed) {
+  if (!seed) return null;
+  if (typeof seed === 'string') {
+    return {
+      text: seed,
+      sourceDate: todayKey(),
+      sourceThing: '',
+      createdAt: new Date().toISOString()
+    };
+  }
+  if (typeof seed === 'object' && typeof seed.text === 'string') return seed;
+  return null;
 }
 
 function saveState() {
@@ -77,7 +111,7 @@ function uid() {
 }
 
 function escapeHtml(value) {
-  return value
+  return String(value || '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
@@ -85,121 +119,139 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
-function createRecord({ name, originalText, approvedText, audit, revised }) {
-  const existingIndex = state.records.findIndex((record) => record.date === todayKey() && record.name === name);
+function getSelectedTime() {
+  return document.querySelector('input[name="time"]:checked')?.value || '60分钟';
+}
+
+function getAnswers() {
+  return {
+    name: cleanText(els.memberName.value),
+    goal: cleanText(els.goalInput.value),
+    obstacle: cleanText(els.obstacleInput.value),
+    time: getSelectedTime(),
+    action: cleanText(els.actionInput.value),
+    deliverable: cleanText(els.deliverableInput.value),
+    feedback: cleanText(els.feedbackInput.value)
+  };
+}
+
+function renderWizardStep() {
+  els.questionSteps.forEach((step, index) => {
+    const active = index === wizardStep;
+    step.hidden = !active;
+    step.classList.toggle('is-active', active);
+  });
+  els.questionCounter.textContent = `问题 ${wizardStep + 1} / 5`;
+  els.progressLabel.textContent = progressLabels[wizardStep];
+  els.progressBar.style.width = `${((wizardStep + 1) / 5) * 100}%`;
+  els.backBtn.hidden = wizardStep === 0;
+  els.nextBtn.textContent = wizardStep === 4 ? '生成今天的一件小事' : '下一步';
+  els.stepError.hidden = true;
+}
+
+function validateStep() {
+  const answers = getAnswers();
+  const rules = [
+    [answers.name && answers.goal, '先写下你的名字和今天最想推进的结果。'],
+    [answers.obstacle, '请只写一个当前最大的卡点。'],
+    [answers.action, '请写下今天可以完成的一个最小动作。'],
+    [answers.deliverable, '请写清做完以后会留下什么结果。'],
+    [answers.feedback, '请写清你准备从哪里获得反馈。']
+  ];
+  const [valid, message] = rules[wizardStep];
+  if (!valid) {
+    els.stepError.textContent = message;
+    els.stepError.hidden = false;
+    return false;
+  }
+  return true;
+}
+
+function buildCandidate() {
+  const answers = getAnswers();
+  const text = buildSmallThing(answers);
+  const audit = auditThing(text);
+  currentCandidate = { answers, text, audit };
+
+  els.discoveryForm.hidden = true;
+  els.planCandidate.hidden = false;
+  els.savedPlan.hidden = true;
+  els.candidateText.textContent = text;
+  els.candidateStatus.textContent = `${audit.score} / 6 项合格`;
+  els.candidateStatus.className = `status-chip ${audit.passed ? 'pass' : 'revise'}`;
+  els.confirmPlanBtn.disabled = !audit.passed;
+  els.candidateChecks.innerHTML = audit.criteria
+    .map((item) => `<li class="${item.passed ? 'is-pass' : 'is-fail'}"><span></span>${escapeHtml(item.name)}</li>`)
+    .join('');
+  els.planCandidate.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function createRecord(candidate) {
+  const { answers, text, audit } = candidate;
+  const existingIndex = state.records.findIndex(
+    (record) => record.date === todayKey() && record.name === answers.name
+  );
   const record = {
     id: existingIndex >= 0 ? state.records[existingIndex].id : uid(),
     date: todayKey(),
     createdAt: new Date().toISOString(),
-    name,
-    originalText,
-    approvedText,
-    revised,
-    audit: audit.criteria.map(({ key, name: criterionName, passed }) => ({ key, name: criterionName, passed })),
+    name: answers.name,
+    goal: answers.goal,
+    obstacle: answers.obstacle,
+    originalText: text,
+    approvedText: text,
+    revised: false,
+    answers,
+    audit: audit.criteria.map(({ key, name, passed }) => ({ key, name, passed })),
     status: 'approved',
     review: null
   };
-  state.memberName = name;
-  if (existingIndex >= 0) {
-    state.records.splice(existingIndex, 1);
-  }
+  if (existingIndex >= 0) state.records.splice(existingIndex, 1);
   state.records.unshift(record);
+  state.memberName = answers.name;
+  state.pendingSeed = null;
   activeRecordId = record.id;
   saveState();
   return record;
 }
 
-function findTodayApprovedRecord() {
-  return state.records.find((record) => record.date === todayKey() && ['approved', 'reviewed'].includes(record.status));
+function findTodayRecord() {
+  return state.records.find(
+    (record) => record.date === todayKey() && ['approved', 'reviewed'].includes(record.status)
+  );
 }
 
-function renderAudit(audit) {
-  els.auditResult.hidden = false;
-  els.auditResult.className = `result-panel ${audit.passed ? 'pass' : 'revise'}`;
-  els.auditResult.innerHTML = '';
-
-  const title = document.createElement('div');
-  title.className = 'result-title';
-  title.innerHTML = `
-    <h3>${audit.passed ? '审核通过，可以开始做' : '暂不通过，需要再拆小一点'}</h3>
-    <span class="status-chip ${audit.passed ? 'pass' : 'revise'}">${audit.score}/6 项通过</span>
-  `;
-  els.auditResult.appendChild(title);
-
-  const list = document.createElement('ul');
-  list.className = 'criteria-list';
-  audit.criteria.forEach((criterion) => {
-    const row = els.criterionTemplate.content.firstElementChild.cloneNode(true);
-    row.classList.add(criterion.passed ? 'is-pass' : 'is-fail');
-    row.querySelector('strong').textContent = criterion.name;
-    row.querySelector('p').textContent = criterion.passed ? criterion.pass : criterion.fail;
-    list.appendChild(row);
-  });
-  els.auditResult.appendChild(list);
-
-  if (audit.passed) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'primary-action';
-    button.style.marginTop = '16px';
-    button.textContent = '确认并开始执行';
-    button.addEventListener('click', () => {
-      const name = cleanText(els.memberName.value);
-      createRecord({
-        name,
-        originalText: audit.text,
-        approvedText: audit.text,
-        audit,
-        revised: false
-      });
-      showSavedPlan(audit.text);
-    });
-    els.auditResult.appendChild(button);
-    els.revisionBuilder.hidden = true;
-  } else {
-    els.revisionBuilder.hidden = false;
-    prefillRevision(audit.text);
-    els.revisionBuilder.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-}
-
-function prefillRevision(original) {
-  els.revTime.value = '45分钟';
-  els.revAction.value = original.replace(/^今天(我)?/, '').replace(/[。；;]$/, '') || '完成1个具体动作';
-  els.revDeliverable.value = guessDeliverable(original);
-  els.revCheck.value = '是否按数量完成、结果是否清楚、下次是否还能继续使用';
-  els.revFeedback.value = '晚上自己复盘，并请AI或1位伙伴给出反馈';
-  els.revisionPreview.hidden = true;
-}
-
-function buildRevisionText() {
-  const time = cleanText(els.revTime.value);
-  const action = cleanText(els.revAction.value);
-  const deliverable = cleanText(els.revDeliverable.value);
-  const check = cleanText(els.revCheck.value);
-  const feedback = cleanText(els.revFeedback.value);
-  if (![time, action, deliverable, check, feedback].every(Boolean)) return '';
-  return `今天我用${time}，完成${action}，留下${deliverable}。做完后检查${check}；反馈方式是${feedback}。`;
-}
-
-function showSavedPlan(text) {
-  els.auditResult.hidden = false;
-  els.auditResult.className = 'result-panel pass';
-  els.auditResult.innerHTML = `
+function showSavedPlan(record) {
+  els.discoveryForm.hidden = true;
+  els.planCandidate.hidden = true;
+  els.savedPlan.hidden = false;
+  els.savedPlan.innerHTML = `
     <div class="result-title">
-      <h3>已保存，今天就围绕这一件事做</h3>
-      <span class="status-chip pass">待执行</span>
+      <h3>今天的目标已经定下来</h3>
+      <span class="status-chip ${record.status === 'reviewed' ? 'pass' : 'revise'}">${record.status === 'reviewed' ? '已闭环' : '待执行'}</span>
     </div>
-    <p>${escapeHtml(text)}</p>
-    <p style="margin-bottom:0;color:var(--muted)">晚上回来填写真实结果，系统再帮你完成复盘。</p>
+    <p class="saved-plan-text">${escapeHtml(record.approvedText)}</p>
+    <p class="result-note">${record.status === 'reviewed' ? '今天已经完成复盘，可以到成长记录查看。' : '先去做，做完以后到“做完复盘”填写真实结果。'}</p>
+    <button id="restartTodayBtn" class="text-action" type="button">重新确定今天的一件小事</button>
   `;
-  els.revisionBuilder.hidden = true;
-  renderReview();
-  renderHistory();
+  document.getElementById('restartTodayBtn').addEventListener('click', () => {
+    els.savedPlan.hidden = true;
+    els.discoveryForm.hidden = false;
+    wizardStep = 0;
+    renderWizardStep();
+  });
+}
+
+function renderSeed() {
+  const seed = state.pendingSeed;
+  const hasSeed = Boolean(seed?.text && seed.sourceDate && seed.sourceDate < todayKey());
+  els.seedPanel.hidden = !hasSeed;
+  if (!hasSeed) return;
+  els.seedText.textContent = seed.text;
 }
 
 function renderReview() {
-  const record = findTodayApprovedRecord();
+  const record = findTodayRecord();
   activeRecordId = record?.id || null;
   els.reviewResult.hidden = true;
   if (!record) {
@@ -213,15 +265,11 @@ function renderReview() {
   els.approvedThingText.textContent = record.approvedText;
   const review = record.review || {};
   els.executionResult.value = review.executionResult || '';
-  els.wentWell.value = review.wentWell || '';
-  els.wentWrong.value = review.wentWrong || '';
-  els.feedbackEvidence.value = review.feedbackEvidence || '';
+  els.notCompleted.value = review.notCompleted || review.wentWrong || '';
+  els.newBlockers.value = review.newBlockers || review.feedbackEvidence || '';
+  els.improvements.value = review.improvements || review.solidifyMethod || '';
   els.nextImprovement.value = review.nextImprovement || '';
-  els.solidifyMethod.value = review.solidifyMethod || '';
-
-  if (record.status === 'reviewed') {
-    renderReviewResult(record);
-  }
+  if (record.status === 'reviewed') renderReviewResult(record);
 }
 
 function renderReviewResult(record) {
@@ -229,14 +277,18 @@ function renderReviewResult(record) {
   els.reviewResult.className = 'result-panel pass';
   els.reviewResult.innerHTML = `
     <div class="result-title">
-      <h3>今日闭环已完成</h3>
+      <h3>今天的闭环完成了</h3>
       <span class="status-chip pass">已复盘</span>
     </div>
     <div class="review-summary">
-      <div><strong>做得好的地方</strong><p>${escapeHtml(record.review.wentWell)}</p></div>
-      <div><strong>需要改进的地方</strong><p>${escapeHtml(record.review.wentWrong)}</p></div>
+      <div><strong>真实结果</strong><p>${escapeHtml(record.review.executionResult)}</p></div>
+      <div><strong>新的卡点</strong><p>${escapeHtml(record.review.newBlockers)}</p></div>
       <div><strong>明天只改一个点</strong><p>${escapeHtml(record.review.nextImprovement)}</p></div>
-      <div><strong>可以固化的做法</strong><p>${escapeHtml(record.review.solidifyMethod)}</p></div>
+    </div>
+    <div class="tomorrow-seed">
+      <span>明日线索</span>
+      <strong>${escapeHtml(record.review.nextImprovement)}</strong>
+      <p>这条线索已经保存。最早明天再次打开工作台时，它才会出现，并从第 1 问重新判断。</p>
     </div>
   `;
 }
@@ -244,16 +296,16 @@ function renderReviewResult(record) {
 function renderHistory() {
   const records = state.records;
   const reviewed = records.filter((record) => record.status === 'reviewed').length;
-  const revised = records.filter((record) => record.revised).length;
-  els.historyStats.textContent = `共 ${records.length} 条 · 完成闭环 ${reviewed} 条 · 修改后通过 ${revised} 条`;
+  els.historyStats.textContent = `共 ${records.length} 次行动 · 完成闭环 ${reviewed} 次`;
   els.historyList.innerHTML = '';
 
   if (!records.length) {
-    els.historyList.innerHTML = '<div class="empty-state">还没有记录。完成第一次审核后，这里会留下你的行动轨迹。</div>';
+    els.historyList.innerHTML = '<div class="empty-state">还没有记录。完成第一次问答后，这里会留下你的行动轨迹。</div>';
     return;
   }
 
   records.forEach((record) => {
+    const review = record.review || {};
     const article = document.createElement('article');
     article.className = 'history-item';
     const statusLabel = record.status === 'reviewed' ? '已闭环' : '待复盘';
@@ -262,21 +314,20 @@ function renderHistory() {
       <div class="history-head">
         <div>
           <strong>${escapeHtml(record.name)}</strong>
-          <div class="history-meta">${record.date}${record.revised ? ' · 修改后通过' : ' · 直接通过'}</div>
+          <div class="history-meta">${record.date}${record.goal ? ` · ${escapeHtml(record.goal)}` : ''}</div>
         </div>
         <span class="status-chip ${statusClass}">${statusLabel}</span>
       </div>
       <p class="history-thing">${escapeHtml(record.approvedText)}</p>
       ${record.review ? `
         <details class="history-details">
-          <summary>查看复盘结果</summary>
+          <summary>查看这次闭环</summary>
           <dl>
-            <dt>实际结果</dt><dd>${escapeHtml(record.review.executionResult)}</dd>
-            <dt>做得好</dt><dd>${escapeHtml(record.review.wentWell)}</dd>
-            <dt>卡点</dt><dd>${escapeHtml(record.review.wentWrong)}</dd>
-            <dt>反馈</dt><dd>${escapeHtml(record.review.feedbackEvidence)}</dd>
-            <dt>明天改进</dt><dd>${escapeHtml(record.review.nextImprovement)}</dd>
-            <dt>固化沉淀</dt><dd>${escapeHtml(record.review.solidifyMethod)}</dd>
+            <dt>实际做到</dt><dd>${escapeHtml(review.executionResult)}</dd>
+            <dt>没有做到</dt><dd>${escapeHtml(review.notCompleted || review.wentWrong)}</dd>
+            <dt>新的卡点</dt><dd>${escapeHtml(review.newBlockers || review.feedbackEvidence)}</dd>
+            <dt>改进办法</dt><dd>${escapeHtml(review.improvements || review.solidifyMethod)}</dd>
+            <dt>明天改一点</dt><dd>${escapeHtml(review.nextImprovement)}</dd>
           </dl>
         </details>
       ` : ''}
@@ -295,42 +346,51 @@ function switchView(viewName) {
 
 els.tabs.forEach((tab) => tab.addEventListener('click', () => switchView(tab.dataset.view)));
 
-els.smallThingInput.addEventListener('input', () => {
-  els.thingCount.textContent = els.smallThingInput.value.length;
-});
-
-els.planForm.addEventListener('submit', (event) => {
-  event.preventDefault();
-  const name = cleanText(els.memberName.value);
-  const text = cleanText(els.smallThingInput.value);
-  if (!name || !text) return;
-  latestAudit = auditThing(text);
-  renderAudit(latestAudit);
-});
-
-els.generateRevisionBtn.addEventListener('click', () => {
-  const text = buildRevisionText();
-  if (!text) {
-    els.revisionPreview.hidden = false;
-    els.revisionText.textContent = '请先把五个字段补完整。';
+els.nextBtn.addEventListener('click', () => {
+  if (!validateStep()) return;
+  if (wizardStep < 4) {
+    wizardStep += 1;
+    renderWizardStep();
     return;
   }
-  els.revisionText.textContent = text;
-  els.revisionPreview.hidden = false;
+  buildCandidate();
 });
 
-els.approveRevisionBtn.addEventListener('click', () => {
-  const revisedText = buildRevisionText();
-  if (!revisedText || !latestAudit) return;
-  const finalAudit = auditThing(revisedText);
-  createRecord({
-    name: cleanText(els.memberName.value),
-    originalText: latestAudit.text,
-    approvedText: revisedText,
-    audit: finalAudit,
-    revised: true
-  });
-  showSavedPlan(revisedText);
+els.backBtn.addEventListener('click', () => {
+  wizardStep = Math.max(0, wizardStep - 1);
+  renderWizardStep();
+});
+
+els.editAnswersBtn.addEventListener('click', () => {
+  els.planCandidate.hidden = true;
+  els.discoveryForm.hidden = false;
+  wizardStep = 0;
+  renderWizardStep();
+});
+
+els.confirmPlanBtn.addEventListener('click', () => {
+  if (!currentCandidate?.audit.passed) return;
+  const record = createRecord(currentCandidate);
+  showSavedPlan(record);
+  renderSeed();
+  renderReview();
+  renderHistory();
+});
+
+els.useSeedBtn.addEventListener('click', () => {
+  const seed = state.pendingSeed;
+  if (!seed?.text) return;
+  els.goalInput.value = `推进上次复盘留下的改进点：${seed.text}`;
+  els.obstacleInput.value = '';
+  els.actionInput.value = '';
+  els.deliverableInput.value = '';
+  els.feedbackInput.value = '';
+  els.discoveryForm.hidden = false;
+  els.savedPlan.hidden = true;
+  els.planCandidate.hidden = true;
+  wizardStep = 0;
+  renderWizardStep();
+  els.discoveryForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
 els.reviewForm.addEventListener('submit', (event) => {
@@ -339,16 +399,22 @@ els.reviewForm.addEventListener('submit', (event) => {
   if (!record) return;
   record.review = {
     executionResult: cleanText(els.executionResult.value),
-    wentWell: cleanText(els.wentWell.value),
-    wentWrong: cleanText(els.wentWrong.value),
-    feedbackEvidence: cleanText(els.feedbackEvidence.value),
+    notCompleted: cleanText(els.notCompleted.value),
+    newBlockers: cleanText(els.newBlockers.value),
+    improvements: cleanText(els.improvements.value),
     nextImprovement: cleanText(els.nextImprovement.value),
-    solidifyMethod: cleanText(els.solidifyMethod.value),
     reviewedAt: new Date().toISOString()
   };
   record.status = 'reviewed';
+  state.pendingSeed = {
+    text: record.review.nextImprovement,
+    sourceDate: record.date,
+    sourceThing: record.approvedText,
+    createdAt: new Date().toISOString()
+  };
   saveState();
   renderReviewResult(record);
+  renderSeed();
   renderHistory();
   els.reviewResult.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
@@ -365,8 +431,13 @@ els.exportBtn.addEventListener('click', () => {
 
 els.todayBadge.textContent = todayLabel();
 els.memberName.value = state.memberName;
+renderWizardStep();
+renderSeed();
 renderReview();
 renderHistory();
+
+const todayRecord = findTodayRecord();
+if (todayRecord) showSavedPlan(todayRecord);
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('./service-worker.js').catch(() => {});
